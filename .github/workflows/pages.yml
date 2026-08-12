@@ -25,15 +25,15 @@ jobs:
 
     steps:
       - name: Get website files
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
       - name: Package the workout website
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
-          path: ./public/training-app
+          path: .
 
       - name: Publish the website
         id: deployment
