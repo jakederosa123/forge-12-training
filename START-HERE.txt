@@ -1,0 +1,133 @@
+FORGE 12 - START HERE
+
+This package is the entire repository. Do not put it inside public, docs, or another folder.
+The website files must be at the top level of the GitHub repository.
+
+WHAT IS INCLUDED
+
+- The full 12-week, six-day training application
+- Day 1 set to Pull A
+- Automatic local saving
+- Laptop and iPhone synchronization through Supabase
+- Email sign-in with no password
+- The GitHub Pages publishing workflow
+- The Supabase table, security policy, trigger, and realtime SQL
+- Offline caching, JSON backup, restore, and CSV export
+- Exercise cards that remain open while you enter sets
+- Load entry for every medicine-ball movement
+
+WHY YOUR PHONE WAS NOT SYNCHRONIZING
+
+If Forge 12 says "Setup needed," the published website does not yet have the
+Supabase Project URL and Publishable Key. It will still save locally, but it
+cannot send that data to another device. Complete Parts 1, 2, 5, and 6 below.
+
+PART 1 - GET TWO VALUES FROM SUPABASE
+
+1. Open your Supabase project.
+2. Click Connect near the top of the project.
+3. Copy the Project URL.
+4. Copy the Publishable Key. It begins with sb_publishable_.
+5. If those values are not in Connect:
+   - Project URL: Integrations > Data API
+   - Publishable Key: Settings > API Keys
+6. Never copy a Secret Key, service_role key, database password, or connection string.
+
+PART 2 - PUT THOSE VALUES INTO config.js
+
+After downloading and unzipping forge-12-training-complete.zip, open Terminal and run:
+
+cd ~/Downloads/forge-12-training-complete
+nano config.js
+
+Replace only the two placeholder values:
+
+window.FORGE_SYNC_CONFIG = {
+  supabaseUrl: "https://YOUR_PROJECT.supabase.co",
+  supabasePublishableKey: "sb_publishable_YOUR_KEY"
+};
+
+Keep the quotation marks. In nano, press Control+O, press Return, then press Control+X.
+
+This is the recommended method because it connects both the laptop and iPhone
+automatically. The updated website also includes fields under Settings where you
+can save these values on one device, but that device-only setup must be repeated
+on every browser.
+
+PART 3 - REPLACE THE GITHUB REPOSITORY
+
+Run these commands in Terminal:
+
+cd ~/Downloads
+git clone https://github.com/jakederosa123/forge-12-training.git forge-12-training-upload
+rsync -av --delete --exclude '.git' --exclude '.DS_Store' forge-12-training-complete/ forge-12-training-upload/
+cd forge-12-training-upload
+git add -A
+git commit -m "Publish complete Forge 12 training app with sync"
+git push origin main
+
+The rsync command deletes the old misplaced files only inside the temporary
+forge-12-training-upload clone. It does not delete the downloaded package.
+
+If Terminal says forge-12-training-upload already exists, repeat the commands with
+forge-12-training-upload-2 as the name in the git clone, rsync, and cd commands.
+
+If GitHub asks you to sign in, complete the GitHub sign-in prompt and run the final
+git push origin main command again.
+
+PART 4 - PUBLISH WITH GITHUB PAGES
+
+1. Open https://github.com/jakederosa123/forge-12-training
+2. Open Settings > Pages.
+3. Under Build and deployment, set Source to GitHub Actions.
+4. Open the Actions tab.
+5. Open Publish Forge 12.
+6. Wait for a green check.
+7. Open https://jakederosa123.github.io/forge-12-training/
+8. If the old page appears, wait two minutes and refresh again. On iPhone, fully
+   close Safari or the Home Screen app once, then reopen it.
+
+PART 5 - FINISH SUPABASE
+
+1. In Supabase, open SQL Editor.
+2. Open supabase/setup.sql from this package, copy all of it, paste it into a new
+   Supabase query, and click Run.
+3. It is safe to run this SQL again even though training_state already exists.
+4. Open Authentication > URL Configuration.
+5. Set Site URL to:
+   https://jakederosa123.github.io/forge-12-training/
+6. Add this exact Redirect URL:
+   https://jakederosa123.github.io/forge-12-training/
+7. Save the URL configuration.
+
+PART 6 - SIGN IN AND TEST SYNCHRONIZATION
+
+1. Open the published training site on the laptop.
+2. Open Settings inside Forge 12.
+3. Enter your email and choose Email me a sign-in link.
+4. Open the email on the laptop and tap the link there.
+5. Log one test set and wait until the top status says Synced.
+6. On iPhone, open the same website in Safari.
+7. Open Settings, enter the same email, and request a new sign-in link.
+8. Open that new email link on the iPhone.
+9. Confirm the laptop test set appears.
+10. Enter a different test number on the iPhone and wait for Synced.
+11. Return to the laptop, press Sync now in Settings, and confirm the number appears.
+12. In Safari, choose Share > Add to Home Screen if you want an app icon.
+
+If the site still says Setup needed after republishing, open the repository's
+config.js file on GitHub and confirm that the placeholder words YOUR_SUPABASE
+are gone. Do not send your key in a message or screenshot.
+
+OLD LOCAL DATA NOTE
+
+Data stored at localhost belongs to that localhost address and will not appear at
+the GitHub Pages address automatically. If you already logged workouts in the old
+local site, download a JSON backup there first. Restore that backup in Settings on
+the published site, then wait for Synced.
+
+SAFETY NOTE
+
+The Publishable Key is intended for browser applications when Row Level Security
+is enabled. The included SQL enables Row Level Security so each signed-in account
+can access only its own training row. Never publish a Secret Key or service_role key.
