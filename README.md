@@ -49,6 +49,9 @@ If `forge-12-training-upload` already exists, use a new name such as `forge-12-t
 ## Synchronization behavior
 
 - The app saves locally first.
+- The app supports direct email-and-password sign-in on the laptop and iPhone Home Screen app.
+- Existing email-link users can set or change a password while signed in.
+- A one-time email link remains available as a fallback.
 - Signed-in devices synchronize through the `training_state` table.
 - Each account can read and write only its own row through Row Level Security.
 - When laptop and phone both changed, session records are merged using per-record modification times.
@@ -60,3 +63,5 @@ If `forge-12-training-upload` already exists, use a new name such as `forge-12-t
 - Typing a load or rep does not rebuild the workout screen or remove input focus.
 - Expanded exercise cards remain expanded during automatic saving and after set completion.
 - Medicine Ball Chest Pass, Medicine Ball Rotational Throw, and Medicine Ball Slam include load and rep fields while retaining their throw-quality note field.
+- A built-in guide explains tempo, straight sets, final RIR, load, reps, and basic logging.
+- Loaded exercises no longer show a duplicate `load × reps` result field. The app calculates volume automatically from the separate load and rep entries.

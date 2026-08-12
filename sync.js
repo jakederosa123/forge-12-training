@@ -123,7 +123,44 @@ export function createSyncManager({ getState, replaceState, requestRender, notif
       settingsButton?.click();
       return;
     }
-    if (action === "sync-sign-in") {
+    if (action === "sync-sign-in-password" || action === "sync-sign-up-password") {
+      const email = document.querySelector("#sync-email")?.value.trim() || "";
+      const password = document.querySelector("#sync-password")?.value || "";
+      if (!email || !email.includes("@")) {
+        notify("Enter a valid email address.");
+        return;
+      }
+      if (password.length < 8) {
+        notify("Use a password with at least 8 characters.");
+        return;
+      }
+      status = "syncing";
+      requestRender();
+      if (action === "sync-sign-in-password") {
+        const { error } = await client.auth.signInWithPassword({ email, password });
+        if (error) return fail(error);
+        notify("Signed in. Your workouts are synchronizing now.");
+        return;
+      }
+      const { data, error } = await client.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: `${location.origin}${location.pathname}` },
+      });
+      if (error) return fail(error);
+      if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        return fail(new Error("This email already has an account. Sign in with your password, or use the email-link option once and then set a password."));
+      }
+      if (data.session) {
+        notify("Account created and signed in. Synchronization is starting.");
+      } else {
+        status = "email-sent";
+        requestRender();
+        notify("Account created. Check your email once to confirm it, then sign in with your password.");
+      }
+      return;
+    }
+    if (action === "sync-email-link") {
       const input = document.querySelector("#sync-email");
       const email = input?.value.trim();
       if (!email || !email.includes("@")) {
@@ -140,6 +177,19 @@ export function createSyncManager({ getState, replaceState, requestRender, notif
       status = "email-sent";
       requestRender();
       notify("Sign-in link sent. Open your email and tap the link.");
+      return;
+    }
+    if (action === "sync-set-password") {
+      const password = document.querySelector("#sync-new-password")?.value || "";
+      if (password.length < 8) {
+        notify("Use a password with at least 8 characters.");
+        return;
+      }
+      const { error } = await client.auth.updateUser({ password });
+      if (error) return fail(error);
+      notify("Password saved. You can now sign in directly from your iPhone app icon.");
+      const input = document.querySelector("#sync-new-password");
+      if (input) input.value = "";
       return;
     }
     if (action === "sync-now") {
@@ -271,10 +321,23 @@ export function createSyncManager({ getState, replaceState, requestRender, notif
       return `<section class="panel sync-panel"><div class="panel-header"><div><span class="eyebrow">Laptop and iPhone</span><h2>Connect this device to Supabase</h2><p>Paste the Project URL and Publishable Key from your Supabase project. You can also place them in <strong>config.js</strong> once to configure every device.</p></div><span class="status-pill modify">Setup needed</span></div><div class="sync-setup"><div class="field"><label for="sync-project-url">Supabase Project URL</label><input id="sync-project-url" type="url" inputmode="url" autocomplete="url" placeholder="https://your-project.supabase.co"></div><div class="field"><label for="sync-publishable-key">Supabase Publishable Key</label><input id="sync-publishable-key" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="sb_publishable_..."></div><button class="button" data-action="sync-save-config">Save connection on this device</button></div><p class="micro-copy">Use only a Publishable Key. Never enter a Secret Key, service_role key, database password, or connection string.</p></section>`;
     }
     if (!user) {
-      return `<section class="panel sync-panel"><div class="panel-header"><div><span class="eyebrow">Laptop and iPhone</span><h2>Sign in to synchronize</h2><p>Use the same email on every device. We will email you a one-time sign-in link, so there is no password to remember.</p></div><span class="status-pill hold">Local only</span></div><div class="sync-signin"><div class="field"><label for="sync-email">Email address</label><input id="sync-email" type="email" autocomplete="email" placeholder="you@example.com"></div><button class="button" data-action="sync-sign-in">Email me a sign-in link</button></div>${status === "email-sent" ? `<div class="readiness-summary"><strong>Check your email</strong><span>Open the message on this device and tap the sign-in link.</span></div>` : ""}</section>`;
+      return `<section class="panel sync-panel">
+        <div class="panel-header"><div><span class="eyebrow">Laptop and iPhone</span><h2>Sign in to synchronize</h2><p>Sign in directly with the same email and password on every device. Your session stays saved on that device until you sign out or clear its website data.</p></div><span class="status-pill hold">Local only</span></div>
+        <div class="sync-credentials">
+          <div class="field"><label for="sync-email">Email address</label><input id="sync-email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com"></div>
+          <div class="field"><label for="sync-password">Password</label><input id="sync-password" type="password" autocomplete="current-password" minlength="8" placeholder="At least 8 characters"></div>
+          <div class="button-row"><button class="button" data-action="sync-sign-in-password">Sign in</button><button class="button-secondary" data-action="sync-sign-up-password">Create account</button></div>
+        </div>
+        <details class="auth-fallback"><summary>Already used an email sign-in link and do not have a password?</summary><p>Use the email link one more time on your laptop. Once signed in, return here and set a password. After that, the iPhone Home Screen app can sign in directly.</p><button class="button-ghost small" data-action="sync-email-link">Email me a one-time sign-in link</button></details>
+        ${status === "email-sent" ? `<div class="readiness-summary"><strong>Check your email</strong><span>Open the message on this device, return to Settings, and create your password.</span></div>` : ""}
+      </section>`;
     }
     const details = statusDetails();
-    return `<section class="panel sync-panel"><div class="panel-header"><div><span class="eyebrow">Laptop and iPhone</span><h2>Cloud synchronization</h2><p>Signed in as ${escapeHtml(user.email || "your account")}. Workouts save locally first and upload whenever internet is available.</p></div><span class="status-pill ${details.pillClass}">${details.label}</span></div><div class="sync-account"><div><span class="metric-label">Last cloud save</span><strong>${lastSyncedAt ? formatTime(lastSyncedAt) : "Waiting for first sync"}</strong>${errorMessage ? `<p class="sync-error">${escapeHtml(errorMessage)}</p>` : ""}</div><div class="button-row"><button class="button" data-action="sync-now">Sync now</button><button class="button-ghost" data-action="sync-sign-out">Sign out</button></div></div></section>`;
+    return `<section class="panel sync-panel">
+      <div class="panel-header"><div><span class="eyebrow">Laptop and iPhone</span><h2>Cloud synchronization</h2><p>Signed in as ${escapeHtml(user.email || "your account")}. Workouts save locally first and upload whenever internet is available.</p></div><span class="status-pill ${details.pillClass}">${details.label}</span></div>
+      <div class="sync-account"><div><span class="metric-label">Last cloud save</span><strong>${lastSyncedAt ? formatTime(lastSyncedAt) : "Waiting for first sync"}</strong>${errorMessage ? `<p class="sync-error">${escapeHtml(errorMessage)}</p>` : ""}</div><div class="button-row"><button class="button" data-action="sync-now">Sync now</button><button class="button-ghost" data-action="sync-sign-out">Sign out</button></div></div>
+      <div class="password-setup"><div><strong>Direct iPhone login</strong><p>If this account previously used email links, set a password once. Then use this email and password inside the Home Screen app.</p></div><div class="field"><label for="sync-new-password">New or replacement password</label><input id="sync-new-password" type="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters"></div><button class="button-secondary" data-action="sync-set-password">Save password</button></div>
+    </section>`;
   }
 
   function statusDetails() {
@@ -392,6 +455,9 @@ function maxDate(a, b) {
 function friendlyError(error) {
   const message = error?.message || String(error || "Cloud synchronization failed.");
   if (/Failed to fetch|NetworkError/i.test(message)) return "No internet connection. Your workout is still saved locally.";
+  if (/invalid login credentials/i.test(message)) return "That email and password did not match. If you previously used email links, use the link option once and set a password after signing in.";
+  if (/email not confirmed/i.test(message)) return "Confirm the account from the Supabase email once, then sign in with your password.";
+  if (/password.*(short|characters|length)/i.test(message)) return "Use a password with at least 8 characters.";
   if (/training_state|relation/i.test(message)) return "The Supabase training table is not ready. Run supabase/setup.sql in the SQL Editor.";
   if (/row-level security|policy|permission/i.test(message)) return "Supabase security rules blocked the save. Run the complete setup SQL again.";
   return message;

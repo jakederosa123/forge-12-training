@@ -25,3 +25,17 @@ FORGE 12 FIXES
 5. GitHub Pages workflow
    - Publishes the repository root, where index.html actually lives.
    - Uses the current checkout and Pages artifact actions.
+FORGE 12 UPDATE: CLEARER LOGGING AND DIRECT IPHONE LOGIN
+
+- Added an expandable workout guide explaining tempo, straight sets, final RIR,
+  load, reps, and practical logging tips.
+- Added plain-language tempo and training-method explanations inside each
+  exercise card.
+- Removed the duplicate load x reps result field from loaded exercises. Enter
+  load and reps separately, and Forge calculates volume automatically.
+- Added clearer set labels for seconds, minutes, contacts, and loaded meters.
+- Added direct email-and-password sign-in for the iPhone Home Screen app and
+  laptop.
+- Existing email-link users can set a password while signed in. The one-time
+  email link remains available as a fallback.
+- Increased the offline cache version so updated devices receive these files.

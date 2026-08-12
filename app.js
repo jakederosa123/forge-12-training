@@ -189,6 +189,7 @@ function renderWorkout(session) {
     ${renderReadinessPanel(session, readiness, readinessResult)}
 
     <section class="workout-heading"><div><span class="eyebrow">Session plan</span><h2>Work sets</h2><p>Open a movement to log sets, RIR, pain, and performance.</p></div><button class="button-ghost small" data-action="print">Print session</button></section>
+    ${renderTrainingGuide()}
     <section class="exercise-list">${session.exercises.map((exercise) => renderExercise(exercise, readinessResult, recommendations[exercise.id])).join("")}</section>
 
     <section class="session-footer panel">
@@ -237,13 +238,16 @@ function renderExercise(exercise, readinessResult, recommendation) {
         <button class="expand-button" data-action="toggle-exercise" data-exercise="${exercise.id}" aria-label="Open ${escapeHtml(exercise.exercise)}" aria-expanded="${expandedExercises.has(exercise.id)}">⌄</button>
       </div>
       <div class="exercise-detail">
-        <div class="coach-note"><strong>Execution</strong><span>${escapeHtml(exercise.cue)}</span><span>Tempo ${escapeHtml(exercise.tempo)} · ${escapeHtml(exercise.method)}</span></div>
+        <div class="coach-note">
+          <div class="note-box"><strong>Execution cue</strong><span>${escapeHtml(exercise.cue)}</span></div>
+          <div class="note-box"><strong>Tempo and method</strong><span>Tempo ${escapeHtml(exercise.tempo)}. ${escapeHtml(tempoMeaning(exercise.tempo))}</span><span class="field-hint">${escapeHtml(methodMeaning(exercise.method, exercise.pair))}</span></div>
+        </div>
         <div class="note-box"><strong>Substitutions</strong><span>${escapeHtml(exercise.substitute1)} or ${escapeHtml(exercise.substitute2)}</span></div>
         <div class="set-grid">${log.sets.slice(0, setCount).map((set, index) => renderSetRow(exercise, set, index, isLoad)).join("")}</div>
         <div class="exercise-feedback">
-          <div class="field-compact"><label>Final RIR</label><input aria-label="Final RIR" inputmode="numeric" type="number" min="0" max="10" step="1" value="${valueAttr(log.finalRIR)}" data-action="exercise-log" data-exercise="${exercise.id}" data-field="finalRIR"></div>
+          <div class="field-compact"><label>Final RIR</label><input aria-label="Final reps in reserve" inputmode="numeric" type="number" min="0" max="10" step="1" value="${valueAttr(log.finalRIR)}" data-action="exercise-log" data-exercise="${exercise.id}" data-field="finalRIR"><span class="field-hint">Clean reps still possible after your last work set.</span></div>
           <div class="field-compact"><label>Pain 0-10</label><input aria-label="Pain 0-10" inputmode="numeric" type="number" min="0" max="10" step="1" value="${valueAttr(log.pain)}" data-action="exercise-log" data-exercise="${exercise.id}" data-field="pain"></div>
-          <div class="field-compact"><label>${escapeHtml(exercise.metric)}</label><input aria-label="${escapeAttr(exercise.metric)} result" type="text" value="${valueAttr(log.metricResult)}" data-action="exercise-log" data-exercise="${exercise.id}" data-field="metricResult" placeholder="Result"></div>
+          ${showsPerformanceResult(exercise) ? `<div class="field-compact"><label>${escapeHtml(performanceResultLabel(exercise))}</label><input aria-label="${escapeAttr(performanceResultLabel(exercise))}" type="text" value="${valueAttr(log.metricResult)}" data-action="exercise-log" data-exercise="${exercise.id}" data-field="metricResult" placeholder="${escapeAttr(performanceResultPlaceholder(exercise))}"></div>` : ""}
           <label class="completion-toggle"><input type="checkbox" ${completed ? "checked" : ""} data-action="exercise-completed" data-exercise="${exercise.id}"><span>Movement complete</span></label>
         </div>
         <div class="result-strip"><span class="status-pill ${status.className}">${status.label}</span><span>${status.message}</span><strong>${recommendation?.next ? `Next: ${formatNumber(recommendation.next)} ${state.program.settings.units}` : "Log the work to create a next-load recommendation."}</strong></div>
@@ -253,12 +257,86 @@ function renderExercise(exercise, readinessResult, recommendation) {
 }
 
 function renderSetRow(exercise, set, index, isLoad) {
+  const entryLabel = setEntryLabel(exercise);
   return `<div class="set-row ${isLoad ? "" : "non-load"}">
     <span class="set-label">Set ${index + 1}</span>
     ${isLoad ? `<div class="field-compact"><label>Load</label><input aria-label="Set ${index + 1} load" inputmode="decimal" type="number" min="0" step="0.5" value="${valueAttr(set.load)}" data-action="set-log" data-exercise="${exercise.id}" data-set="${index}" data-field="load"></div>` : ""}
-    <div class="field-compact"><label>${exercise.metric === "seconds" ? "Seconds" : "Reps"}</label><input aria-label="Set ${index + 1} ${exercise.metric === "seconds" ? "seconds" : "reps"}" inputmode="numeric" type="number" min="0" step="1" value="${valueAttr(set.reps)}" data-action="set-log" data-exercise="${exercise.id}" data-set="${index}" data-field="reps"></div>
+    <div class="field-compact"><label>${escapeHtml(entryLabel)}</label><input aria-label="Set ${index + 1} ${escapeAttr(entryLabel.toLowerCase())}" inputmode="numeric" type="number" min="0" step="1" value="${valueAttr(set.reps)}" data-action="set-log" data-exercise="${exercise.id}" data-set="${index}" data-field="reps"></div>
     <label class="completion-toggle"><input type="checkbox" ${set.done ? "checked" : ""} data-action="set-done" data-exercise="${exercise.id}" data-set="${index}"><span>Done</span></label>
   </div>`;
+}
+
+function renderTrainingGuide() {
+  return `
+    <details class="training-guide">
+      <summary><span>What do tempo, straight sets, RIR, and load × reps mean?</span><span class="guide-open-label" aria-hidden="true"></span></summary>
+      <div class="guide-grid">
+        <article><strong>Tempo</strong><p>The speed of each rep. This program uses lowering, pause, lifting. For example, 3-1-X means lower for 3 seconds, pause for 1 second, then lift explosively. X always means explosive.</p></article>
+        <article><strong>Straight sets</strong><p>Complete the listed sets of this movement with the prescribed rest between sets. Use the same working load unless your form, reps, or pain tell you to adjust it.</p></article>
+        <article><strong>Final RIR</strong><p>RIR means reps in reserve. After the final work set, enter how many more clean reps you believe you could have performed. Enter 0 for none, 1 for one more, 2 for two more, and so on.</p></article>
+        <article><strong>Load and reps</strong><p>Enter the actual weight and actual reps in their separate boxes. You never need to multiply them. Forge calculates load × reps automatically for training volume.</p></article>
+      </div>
+      <div class="quick-tips"><strong>Quick logging tips</strong><ul><li>Log what you actually performed, even when it differs from the plan.</li><li>Check Done after each set, then Movement complete after the exercise.</li><li>Use the recommended load as a starting point, not a requirement.</li><li>Stop or substitute any movement that causes sharp, radiating, or escalating pain.</li></ul></div>
+    </details>`;
+}
+
+function tempoMeaning(tempo) {
+  const value = String(tempo || "").trim();
+  const parts = value.split("-");
+  const phase = (part) => /^x$/i.test(part) ? "explosively" : `${part} second${part === "1" ? "" : "s"}`;
+  if (parts.length === 3 && parts.every((part) => /^\d+$|^x$/i.test(part))) {
+    return `Lower for ${phase(parts[0])}, pause for ${phase(parts[1])}, then lift ${phase(parts[2])}.`;
+  }
+  if (/explosive|max quality|powerful|fast/i.test(value)) return "Move with maximal safe intent, reset fully, and stop when speed or quality drops.";
+  if (/slow|controlled/i.test(value)) return "Use a deliberate, repeatable motion with no rushing or bouncing.";
+  if (/hold/i.test(value)) return "Hold the prescribed position with steady breathing and clean alignment.";
+  if (/easy/i.test(value)) return "Keep the effort easy and use this work to restore movement quality.";
+  return "Follow the written cue with consistent, controlled technique.";
+}
+
+function methodMeaning(method, pair) {
+  const value = String(method || "");
+  if (/straight sets/i.test(value)) return "Straight sets: finish each normal work set with the listed rest before the next set.";
+  if (/superset/i.test(value) || pair) return `Superset${pair ? ` ${pair}` : ""}: alternate the paired movements, then take the planned rest after both.`;
+  if (/top set.*back-off|back-off/i.test(value)) return "Build to the programmed top set, then reduce the load for the remaining back-off sets.";
+  if (/drop/i.test(value)) return "On the specified final set, reduce the load as written and continue with clean reps.";
+  if (/myo-rep/i.test(value)) return "Perform the activation set, take brief rests, then complete the small follow-up sets with the same load.";
+  if (/cluster/i.test(value)) return "Split one work set into the listed mini-groups, using the short rest shown inside that set.";
+  if (/full reset|full recovery|max intent/i.test(value)) return "Treat every effort as high quality, rest fully, and stop when output noticeably drops.";
+  return `${value}. Follow the written cue and prescribed rest.`;
+}
+
+function setEntryLabel(exercise) {
+  const metric = String(exercise.metric || "").toLowerCase();
+  if (metric === "seconds" || /watts \/ meters/.test(metric)) return "Seconds";
+  if (metric === "minutes") return "Minutes";
+  if (metric === "contacts") return "Contacts";
+  if (metric === "load + meters" || metric === "20 m time") return "Meters";
+  return "Reps";
+}
+
+function showsPerformanceResult(exercise) {
+  return /throw quality|watts \/ meters|distance|height|20 m time/i.test(exercise.metric || "");
+}
+
+function performanceResultLabel(exercise) {
+  const metric = String(exercise.metric || "");
+  if (/throw quality/i.test(metric)) return "Throw quality / note";
+  if (/watts \/ meters/i.test(metric)) return "Watts or meters";
+  if (/20 m time/i.test(metric)) return "Best time";
+  if (/height/i.test(metric)) return "Best height";
+  if (/distance/i.test(metric)) return "Best distance";
+  return "Performance result";
+}
+
+function performanceResultPlaceholder(exercise) {
+  const metric = String(exercise.metric || "");
+  if (/throw quality/i.test(metric)) return "Example: crisp, fast release";
+  if (/watts \/ meters/i.test(metric)) return "Example: 410 W or 105 m";
+  if (/time/i.test(metric)) return "Example: 3.42 s";
+  if (/height/i.test(metric)) return "Example: 30 in";
+  if (/distance/i.test(metric)) return "Example: 8 ft 6 in";
+  return "Optional result";
 }
 
 function renderProgress() {
