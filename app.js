@@ -1,3 +1,5 @@
+import { createSyncManager } from "./sync.js";
+
 const STORAGE_KEY = "forge.training.state.v1";
 const APP_ID = "hypertrophy-training-system";
 const VIEWS = ["workout", "progress", "program", "editor", "settings"];
@@ -7,6 +9,7 @@ let defaults;
 let state;
 let saveTimer;
 let toastTimer;
+let syncManager;
 
 const app = document.querySelector("#app");
 const toast = document.querySelector("#toast");
@@ -24,9 +27,16 @@ async function init() {
   defaults = await response.json();
   state = loadState();
   normalizeState();
+  syncManager = createSyncManager({
+    getState: () => clone(state),
+    replaceState: replaceStateFromCloud,
+    requestRender: render,
+    notify: showToast,
+  });
   bindEvents();
   render();
   registerServiceWorker();
+  syncManager.init();
 }
 
 function newState() {
@@ -42,6 +52,7 @@ function newState() {
     sessionCompleted: {},
     loadSearch: "",
     lastSavedAt: null,
+    syncTimes: { program: null, readiness: {}, logs: {}, notes: {}, completed: {} },
   };
 }
 
@@ -69,6 +80,12 @@ function normalizeState() {
   state.readiness ||= {};
   state.sessionNotes ||= {};
   state.sessionCompleted ||= {};
+  state.syncTimes ||= {};
+  state.syncTimes.program ||= null;
+  state.syncTimes.readiness ||= {};
+  state.syncTimes.logs ||= {};
+  state.syncTimes.notes ||= {};
+  state.syncTimes.completed ||= {};
   if (!VIEWS.includes(state.activeView)) state.activeView = "workout";
   state.selectedWeek = clamp(Number(state.selectedWeek) || 1, 1, 12);
   state.selectedDay = clamp(Number(state.selectedDay) || 1, 1, 6);
@@ -99,7 +116,7 @@ function render() {
         <span class="brand-copy"><strong class="brand-name">FORGE 12</strong><span class="brand-subtitle">Autoregulated training system</span></span>
       </button>
       <nav class="primary-nav" aria-label="Main navigation">${navButtons()}</nav>
-      <span class="save-indicator"><span class="save-dot"></span>${state.lastSavedAt ? "Saved locally" : "Local auto-save on"}</span>
+      ${syncManager ? syncManager.renderStatus() : `<span class="save-indicator"><span class="save-dot"></span>Local auto-save on</span>`}
     </header>
     <main class="page">${renderView(session)}</main>
     <nav class="mobile-nav" aria-label="Mobile navigation">${navButtons(true)}</nav>
@@ -309,7 +326,8 @@ function renderSettings() {
   const rmFields = [["benchPress", "Bench press"], ["backSquat", "Back squat"], ["conventionalDeadlift", "Conventional deadlift"], ["overheadPress", "Overhead press"]];
   const numberFields = [["loadIncrement", "Load rounding increment"], ["progressionStep", "Progression decimal"], ["regressionStep", "Regression decimal"], ["greenReadinessThreshold", "Green threshold"], ["redReadinessThreshold", "Red threshold"], ["painThreshold", "Pain stop threshold"]];
   return `
-    <section class="page-heading"><div><span class="eyebrow">System settings</span><h1 class="display-title">Your loads. Your data.</h1><p class="lede">Everything is stored in this browser. Use backup before clearing browser data or moving to another device.</p></div></section>
+    <section class="page-heading"><div><span class="eyebrow">System settings</span><h1 class="display-title">Your loads. Your data.</h1><p class="lede">Every entry saves in this browser first. Sign in below to keep your laptop and iPhone synchronized.</p></div></section>
+    ${syncManager ? syncManager.renderPanel() : ""}
     <section class="settings-grid">
       <article class="panel settings-section"><div class="panel-header"><div><span class="eyebrow">Calendar and units</span><h2>Program setup</h2></div></div><div class="editor-fields"><div class="field"><label>Week 1 start date</label><input aria-label="Week 1 start date" type="date" value="${valueAttr(settings.startDate)}" data-action="setting" data-field="startDate"></div><div class="field"><label>Units</label><select aria-label="Units" data-action="setting" data-field="units"><option value="lb" ${settings.units === "lb" ? "selected" : ""}>lb</option><option value="kg" ${settings.units === "kg" ? "selected" : ""}>kg</option></select></div>${numberFields.map(([field, label]) => `<div class="field"><label>${label}</label><input aria-label="${escapeAttr(label)}" type="number" step="any" value="${valueAttr(settings[field])}" data-action="setting" data-field="${field}"></div>`).join("")}</div></article>
       <article class="panel settings-section"><div class="panel-header"><div><span class="eyebrow">Primary lifts</span><h2>Estimated 1RMs</h2><p>Used when a programmed movement includes a percentage prescription.</p></div></div><div class="editor-fields">${rmFields.map(([field, label]) => `<div class="field"><label>${label} (${settings.units})</label><input aria-label="${escapeAttr(label)} estimated 1RM" type="number" min="0" step="0.5" value="${valueAttr(settings.estimated1RMs[field])}" data-action="one-rm" data-field="${field}"></div>`).join("")}</div></article>
@@ -321,7 +339,7 @@ function renderSettings() {
       <article class="action-card"><h3>Export workout log</h3><p>Download completed and in-progress set records as a CSV spreadsheet.</p><button class="button-secondary" data-action="export-csv">Export CSV</button></article>
       <article class="action-card"><h3>Reset local data</h3><p>Erase workout history and edits on this browser, then restore the included 12-week plan.</p><button class="button-danger" data-action="reset-all">Reset everything</button></article>
     </section>
-    <div class="storage-notice"><strong>Local storage notice</strong><span>This free version has no cloud account. Browser clearing, private browsing, or a device change can remove access to local data. Keep a backup file somewhere safe.</span></div>
+    <div class="storage-notice"><strong>Local storage and backup</strong><span>Every entry saves on this device first. Cloud sync copies it to your signed-in account when internet is available. Keep an occasional backup file as an extra safeguard.</span></div>
     <section class="guardrail"><span class="eyebrow">Training guardrails</span><ul class="guardrail-list">${state.program.guardrails.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
   `;
 }
@@ -338,6 +356,10 @@ function handleClick(event) {
   }
   const action = target.dataset.action;
   if (!action) return;
+  if (action.startsWith("sync-")) {
+    syncManager?.handleAction(action, target);
+    return;
+  }
   if (action === "previous-session" || action === "next-session") moveSession(action === "next-session" ? 1 : -1);
   if (action === "toggle-exercise") target.closest(".exercise-card")?.classList.toggle("open");
   if (action === "print") window.print();
@@ -361,6 +383,7 @@ function handleInput(event) {
     const values = getReadiness(target.dataset.session);
     values[target.dataset.field] = Number(target.value);
     values.touched = true;
+    markDataChange("readiness", target.dataset.session);
     scheduleSave();
     renderPreservingScroll();
   } else if (action === "set-log") {
@@ -368,31 +391,39 @@ function handleInput(event) {
     const log = getExerciseLog(exercise);
     ensureSetRows(log, Number(target.dataset.set) + 1);
     log.sets[Number(target.dataset.set)][target.dataset.field] = nullableNumber(target.value);
+    markDataChange("logs", target.dataset.exercise);
     scheduleSave();
   } else if (action === "exercise-log") {
     const exercise = findExercise(target.dataset.exercise);
     const log = getExerciseLog(exercise);
     log[target.dataset.field] = target.dataset.field === "metricResult" ? target.value : nullableNumber(target.value);
+    markDataChange("logs", target.dataset.exercise);
     scheduleSave();
   } else if (action === "session-notes") {
     state.sessionNotes[target.dataset.session] = target.value;
+    markDataChange("notes", target.dataset.session);
     scheduleSave();
   } else if (action === "edit-session") {
     getSession()[target.dataset.field] = target.value;
+    markDataChange("program");
     scheduleSave();
   } else if (action === "edit-exercise") {
     const exercise = findExercise(target.dataset.exercise);
     const numeric = ["plannedSets", "repLow", "repHigh", "targetRIR", "restSec", "loadFactor", "percent1RM"].includes(target.dataset.field);
     exercise[target.dataset.field] = numeric ? nullableNumber(target.value) : target.value;
+    markDataChange("program");
     scheduleSave();
   } else if (action === "setting") {
     state.program.settings[target.dataset.field] = target.type === "number" ? nullableNumber(target.value) : target.value;
+    markDataChange("program");
     scheduleSave();
   } else if (action === "one-rm") {
     state.program.settings.estimated1RMs[target.dataset.field] = nullableNumber(target.value) || 0;
+    markDataChange("program");
     scheduleSave();
   } else if (action === "starting-load") {
     state.program.settings.startingLoads[target.dataset.exerciseName] = nullableNumber(target.value) || 0;
+    markDataChange("program");
     scheduleSave();
   } else if (action === "load-search") {
     state.loadSearch = target.value;
@@ -422,11 +453,13 @@ function handleChange(event) {
     const log = getExerciseLog(exercise);
     ensureSetRows(log, Number(target.dataset.set) + 1);
     log.sets[Number(target.dataset.set)].done = target.checked;
+    markDataChange("logs", target.dataset.exercise);
     scheduleSave();
     renderPreservingScroll();
   } else if (action === "exercise-completed") {
     const exercise = findExercise(target.dataset.exercise);
     getExerciseLog(exercise).completed = target.checked;
+    markDataChange("logs", target.dataset.exercise);
     scheduleSave();
     renderPreservingScroll();
   } else if (["setting", "one-rm", "starting-load"].includes(action)) {
@@ -456,6 +489,7 @@ function openSession(week, day) {
 
 function toggleSessionComplete(sessionId) {
   state.sessionCompleted[sessionId] = !state.sessionCompleted[sessionId];
+  markDataChange("completed", sessionId);
   scheduleSave(true);
   renderPreservingScroll();
 }
@@ -464,6 +498,7 @@ function addExercise() {
   const session = getSession();
   const stamp = Date.now().toString(36);
   session.exercises.push({ id: `${session.id}custom${stamp}`, slot: session.exercises.length + 1, exercise: "New Movement", category: "Hypertrophy", primaryMuscle: "Other", pattern: "Custom", method: "Straight sets", pair: "", plannedSets: 3, repLow: 8, repHigh: 12, targetRIR: 2, restSec: 90, tempo: "Controlled", loadFactor: 1, percent1RM: 0, metric: "load × reps", substitute1: "Pain-free equivalent", substitute2: "Machine or cable equivalent", cue: "Use controlled, repeatable technique" });
+  markDataChange("program");
   scheduleSave(true);
   renderPreservingScroll();
 }
@@ -474,6 +509,7 @@ function removeExercise(id) {
   if (!exercise || !window.confirm(`Remove ${exercise.exercise} from this session?`)) return;
   session.exercises = session.exercises.filter((item) => item.id !== id);
   resequence(session);
+  markDataChange("program");
   scheduleSave(true);
   renderPreservingScroll();
 }
@@ -485,6 +521,7 @@ function moveExercise(id, direction) {
   if (index < 0 || next < 0 || next >= session.exercises.length) return;
   [session.exercises[index], session.exercises[next]] = [session.exercises[next], session.exercises[index]];
   resequence(session);
+  markDataChange("program");
   scheduleSave(true);
   renderPreservingScroll();
 }
@@ -494,6 +531,7 @@ function resetSession() {
   if (!window.confirm(`Reset Week ${session.week}, Day ${session.day} to the included program?`)) return;
   const original = defaults.weeks[session.week - 1].sessions[session.day - 1];
   state.program.weeks[session.week - 1].sessions[session.day - 1] = clone(original);
+  markDataChange("program");
   scheduleSave(true);
   renderPreservingScroll();
 }
@@ -676,11 +714,24 @@ function saveNow() {
   state.lastSavedAt = new Date().toISOString();
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    document.querySelectorAll(".save-indicator").forEach((item) => { item.innerHTML = `<span class="save-dot"></span>Saved locally`; });
+    syncManager?.localChanged();
   } catch (error) {
     console.error(error);
     showToast("Browser storage is full. Download a backup now.");
   }
+}
+
+function markDataChange(section, id = null) {
+  const timestamp = new Date().toISOString();
+  if (section === "program") state.syncTimes.program = timestamp;
+  else state.syncTimes[section][id] = timestamp;
+}
+
+function replaceStateFromCloud(nextState) {
+  state = nextState;
+  normalizeState();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  render();
 }
 
 function downloadBackup() {

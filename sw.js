@@ -1,9 +1,11 @@
-const CACHE_NAME = "forge-training-v2";
+const CACHE_NAME = "forge-training-v3";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./sync.js",
+  "./config.js",
   "./program-data.json",
   "./manifest.webmanifest",
   "./favicon.svg"

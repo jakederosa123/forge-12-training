@@ -200,6 +200,34 @@ a {
   font-weight: 700;
 }
 
+button.save-indicator {
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+}
+
+button.save-indicator:hover {
+  border-color: var(--line);
+  background: var(--white);
+}
+
+.sync-indicator.pending .save-dot {
+  background: var(--yellow);
+}
+
+.sync-indicator.offline .save-dot,
+.sync-indicator.local .save-dot,
+.sync-indicator.setup .save-dot {
+  background: var(--muted);
+}
+
+.sync-indicator.error .save-dot {
+  background: var(--red);
+}
+
 .save-dot {
   width: 8px;
   height: 8px;
@@ -1340,6 +1368,33 @@ h3 {
   gap: 12px;
 }
 
+.sync-panel {
+  border-color: rgba(49, 93, 124, 0.32);
+  background: linear-gradient(135deg, rgba(255, 254, 249, 0.98), rgba(49, 93, 124, 0.07));
+}
+
+.sync-signin,
+.sync-account {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.sync-signin .field {
+  width: min(480px, 100%);
+}
+
+.sync-account {
+  align-items: center;
+}
+
+.sync-error {
+  margin: 8px 0 0;
+  color: var(--red);
+  font-size: 12px;
+}
+
 .action-card {
   padding: 17px;
   border: 1px solid var(--line);
@@ -1535,6 +1590,19 @@ h3 {
     display: none;
   }
 
+  button.save-indicator {
+    width: 42px;
+    overflow: hidden;
+    gap: 18px;
+    padding: 8px 16px;
+    color: transparent;
+    white-space: nowrap;
+  }
+
+  button.save-indicator .save-dot {
+    flex: 0 0 8px;
+  }
+
   .page {
     padding: 24px 12px 100px;
   }
@@ -1585,8 +1653,16 @@ h3 {
   .settings-grid,
   .data-actions,
   .editor-toolbar,
-  .coach-note {
+  .coach-note,
+  .sync-signin,
+  .sync-account {
     grid-template-columns: 1fr;
+  }
+
+  .sync-signin,
+  .sync-account {
+    display: grid;
+    align-items: stretch;
   }
 
   .panel-header,

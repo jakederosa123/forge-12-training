@@ -1,69 +1,54 @@
 # Forge 12 Training System
 
-Forge 12 is a free, local-first training website built from the included 12-week autoregulated hypertrophy program. It opens with Pull A, runs six days per week, and includes strength, hypertrophy, power, athletic conditioning, mobility, programmed deloads, supersets, drop sets, rest-pause work, and exercise substitutions.
+This repository is ready for GitHub Pages and Supabase synchronization. Its root contains the actual website, so GitHub Pages publishes the training app instead of this README.
 
-No account, paid host, or database is required. Workout data auto-saves in the browser you use. Download a JSON backup from Settings before clearing browser data or moving to another device.
+## Before publishing
 
-## Fastest way to run it
+Open `config.js` and replace the two placeholder values with your Supabase Project URL and Publishable Key. Never put a service-role key or database password in the repository.
 
-You need Node.js 22 or newer.
-
-```bash
-cd hypertrophy-training-system
-npm install
-npm run static
+```js
+window.FORGE_SYNC_CONFIG = {
+  supabaseUrl: "https://YOUR_PROJECT.supabase.co",
+  supabasePublishableKey: "sb_publishable_YOUR_KEY"
+};
 ```
 
-Open `http://localhost:8080` in your browser. Keep that terminal window open while you use the site. Press `Control+C` in the terminal to stop it.
+Run `supabase/setup.sql` in the Supabase SQL Editor. It is safe to run more than once.
 
-## Full development site
+## GitHub Pages
 
-This path runs the Next.js wrapper used for the included build pipeline.
+In the repository, open Settings, then Pages. Under Build and deployment, set Source to GitHub Actions. Each push to `main` will run the included Publish Forge 12 workflow.
 
-```bash
-cd hypertrophy-training-system
-npm install
-npm run dev
-```
+## Supabase URL configuration
 
-Open the local address printed in the terminal.
+In Supabase, open Authentication, then URL Configuration.
 
-## Validate the entire project
+- Site URL: `https://jakederosa123.github.io/forge-12-training/`
+- Redirect URL: `https://jakederosa123.github.io/forge-12-training/`
 
-```bash
-npm run check
-```
+The exact production URL is intentional. The application sends email sign-in links back to this address.
 
-That command verifies the 12-week training data, checks the website files, runs the tests and linter, creates the production build, and validates the resulting artifact.
+## Replace the current repository from a Mac
 
-## Create a clean upload package
+The commands below replace the contents of a fresh local clone. This removes the old misplaced website and malformed workflow from the clone, while preserving the GitHub repository and its history.
 
 ```bash
-npm run package:release
+cd ~/Downloads
+git clone https://github.com/jakederosa123/forge-12-training.git forge-12-training-upload
+rsync -av --delete --exclude '.git' --exclude '.DS_Store' forge-12-training-complete/ forge-12-training-upload/
+cd forge-12-training-upload
+git add -A
+git commit -m "Publish complete Forge 12 training app with sync"
+git push origin main
 ```
 
-The command creates `release/hypertrophy-training-system.zip`. The plain website that can be copied to an existing web host is in `public/training-app/`.
+If `forge-12-training-upload` already exists, use a new name such as `forge-12-training-upload-2` in both commands.
 
-## What is included
+## Synchronization behavior
 
-- 12 weeks and 72 sessions, with 660 programmed exercise entries
-- Pull A as Week 1, Day 1
-- Daily readiness scoring with programmed set and load reductions
-- Set-by-set load and rep logging
-- RIR, pain, metrics, notes, and session completion tracking
-- Automatic next-load recommendations
-- Adherence, tonnage, muscle-volume, and estimated 1RM views
-- Full session and exercise editor
-- JSON backup and restore
-- CSV workout-log export
-- Offline caching after the first successful load
-- The original spreadsheet in `reference/`
-
-## Important storage note
-
-Local browser storage is free, but it belongs to that browser and device. Private browsing, browser cleanup, or a device change can remove access to the saved data. Use Settings, then Download backup, to create a portable copy.
-
-## Training safety
-
-This project is for experienced, healthy adults and is not medical care or injury rehabilitation. Stop for sharp, radiating, or escalating pain. Use the included readiness and pain rules, and get qualified medical guidance when needed.
-
+- The app saves locally first.
+- Signed-in devices synchronize through the `training_state` table.
+- Each account can read and write only its own row through Row Level Security.
+- When laptop and phone both changed, session records are merged using per-record modification times.
+- A local conflict snapshot is kept in browser storage before a merge.
+- JSON backup and restore remain available in Settings.
