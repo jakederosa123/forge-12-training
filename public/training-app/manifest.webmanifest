@@ -1,0 +1,18 @@
+{
+  "name": "12-Week Hypertrophy Training System",
+  "short_name": "Forge Training",
+  "description": "Offline-ready 12-week autoregulated training system.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f1ea",
+  "theme_color": "#161a1d",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
